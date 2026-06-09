@@ -1,6 +1,6 @@
 [project]
 name            = "gramgrab"
-version         = "0.1.1"
+version         = "0.1.2"
 description     = "Telegram backup and OSINT tool"
 authors         = [ {name = "Bart",email = "scarfboy@gmail.com"} ]
 readme          = "README.md"
@@ -14,8 +14,8 @@ dependencies    = [
 ]
 
 [project.scripts]                                                                                                              
-gramgrab        = "gramgrab.gramgrab:main"
-gramparse       = "gramgrab.gramparse:main"
+gramgrab        = "gramgrab.cli:fetcher_main"
+gramparse       = "gramgrab.cli:reader_main"
 
 [build-system]
 requires        = ["poetry-core>=2.0.0,<3.0.0"]
