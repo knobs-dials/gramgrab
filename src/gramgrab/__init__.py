@@ -1,11 +1,6 @@
 #!/usr/bin/python3
 '''
     Don't consider the details to be stable yet.
-
-    Telegram and telethon are a little finicky to to deal with,
-    because telegram's API has some flexible components, and telethon adds more,
-    meaning that 'there's the API, good luck ^-^' is too easy
-    and 'here is a way of doing things' is often too specific to be educational.
 '''
 
 import os
@@ -525,20 +520,6 @@ class Fetcher:
                     #except ValueError as ve:
                     #    print('VE', ve)
 
-            #md['forward'] = await interesting_keys(message.forward)
-            #if isinstance(ob, telethon.custom.forward.Forward):
-            #fw = {'_':'Forward'}
-            #print( dir(message.forward))
-            #for key in ( 'channel_post', 'chat_id', 'date', 'from_id', 'from_name', #'get_chat', 'get_input_chat', 'get_input_sender', 'get_sender', 
-            #           'imported', #'chat',  'sender', 'sender_id'
-            #           'input_chat', 'input_sender', #'is_channel', 'is_group', 
-            #           'post_author',
-            #           'is_private', #'original_fwd', 'psa_type', 
-            #           #'saved_date', 'saved_from_id', 'saved_from_msg_id', 'saved_from_name', 'saved_from_peer', 'saved_out',
-            #    ):
-            #    fw[key] = getattr(message.forward, key)
-            #    print( key, fw[key] )
-
 
         if message.reply_to is not None: # https://core.telegram.org/constructor/messageReplyHeader
             md['reply_to'] = await interesting_keys(message.reply_to) # overwrites what was there
@@ -879,8 +860,8 @@ class SQLiteFetcher(Fetcher):
 
 
 
+    # CONSIDER: maybe we don't need this "fetching things we previouslt didn't" ?
     # async def catchup_media_fetches( self, start_at=0 ):
-    #     # maybe we don't need this "fetching things we previouslt didn't" ?
     #     if self.fetch_media: 
     #         print("Checking for media we didn't fetch before...")
     #         cursor = self.conn.cursor()
