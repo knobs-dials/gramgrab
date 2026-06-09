@@ -1,0 +1,250 @@
+#!/usr/bin/python3
+import os
+import argparse
+import collections
+import asyncio
+import json
+import pprint
+
+import gramgrab
+
+
+import time, datetime
+
+# Helpers to massage data for JSON to be happy
+
+# This is pretty crude and makes assumptions about the data structure,
+# mostly that nested values are either dicts or lists including them;
+def dict_dt_replace_inplace(d, isolike:bool=True):
+    """ Takes a dict,
+        does an in-place replacement of datetime, with either an ISO8601-like string, or a unix timestamp float.
+
+    """
+    for k, v in d.items():
+        if isinstance(v, dict):
+            dict_dt_replace_inplace(v, isolike=isolike)
+        if isinstance(v, list):
+            for th in v:
+                if isinstance(th, dict):
+                    dict_dt_replace_inplace(th)
+        elif isinstance(v, datetime.datetime):
+            if isolike:
+                d[k] = v.strftime('%Y-%m-%dT%H:%M:%S%z')                 # ISO8601-like
+            else:
+                d[k] = time.mktime(v.timetuple()) + (1e-6)*v.microsecond # unix timestamp
+
+def dict_byteval_remove_inplace(d):
+    keys_to_remove = []
+    for k, v in d.items():
+        if isinstance(v, dict):
+            dict_byteval_remove_inplace(v)
+        if isinstance(v, list):
+            for th in v:
+                if isinstance(th, dict):
+                    dict_byteval_remove_inplace(th)
+        elif isinstance(v, bytes):
+            keys_to_remove.append(k)
+    for rk in keys_to_remove:
+        d.pop(rk)
+
+#test = {
+#    'd':'',
+#    'b':b'',
+#    'a':datetime.datetime.now(),
+#    1:{'d':datetime.datetime.now(),'q':b'q'},
+#}
+#dict_byteval_remove_inplace(test)
+#test
+#
+#dict_dt_replace_inplace(test, False)
+#test
+
+
+async def work():    
+
+    parser = argparse.ArgumentParser(
+        description="Telegram OSINT and backup tool - things to do on the fetched data.",
+    )
+
+    parser.add_argument(
+        "--edgelists",
+        default=False,
+        action='store_true',
+        help="save edgelists to edgelists/(id).",
+    )
+
+    parser.add_argument(
+        "--users-in-multiple-channels",
+        default=False,
+        action='store_true',
+        help="Save media to media/",
+    )
+
+    parser.add_argument(
+        "--media-postlist",
+        default=False,
+        action='store_true',
+        help="",
+    )
+
+    parser.add_argument(
+        "--media-save",
+        default=False,
+        action='store_true',
+        help="Save media to media/",
+    )
+
+    parser.add_argument(
+        "--full-users-jsonl",
+        default=False,
+        action='store_true',
+        help="Save user data, one at a time (JSONL to stdout)",
+    )
+
+    parser.add_argument(
+        "--channel-details-jsonl",
+        default=False,
+        action='store_true',
+        help="Save channel data, one at a time (JSONL to stdout)",
+    )
+
+    # media post report / crosspost report 
+
+    args = parser.parse_args()
+
+
+    async with gramgrab.SQLiteReader('gramgrab.db') as reader:
+
+        print('Counting what we have...')
+        pprint.pprint( await reader.db_counts_all() )
+
+
+        if args.edgelists:
+            print('creating edge lists')
+            # edgelist, as in the other chats a message was forwarded from - meant to find related chats
+
+            chan_detail = {}
+            for dt, chid, data in await reader.db_channel_details(): # we will get multiple per channel, but any one will do
+                chan_detail[chid] = data
+
+            for chid in await reader.db_message_channels():
+                print(' -- %s -- '%chid)
+                print( chan_detail.get(chid,None).get('title') )
+
+                for in_chid, msgid, data in await reader.db_messages_all(chid=chid):
+                    #print()
+                    #pprint.pprint(data)
+
+                    fwd_from = data.get('fwd_from', None)
+                    if fwd_from is not None:
+                        from_id = fwd_from.get('from_id', None)
+                        if from_id is not None: # is that even possible?
+                            
+                            if 'channel_id' in from_id: # implicitly filters just for PeerChannel (...sources)
+                                from_channel_id = from_id['channel_id']
+                                print("post from ch=%s (%s) posted to ch=%s (%s)"%(
+                                    from_channel_id, gramgrab.getget( chan_detail, from_channel_id,'title'),
+                                    in_chid,         gramgrab.getget( chan_detail, in_chid,'title'),
+                                )) 
+                    
+
+        if args.users_in_multiple_channels:
+            print('Summarizing users in multiple channels')
+
+            user_details = {}
+            for recorded_at, uid, data in await reader.db_user_full():
+                user_details[uid] = data
+
+            channel_details = {}
+            for dt, chid, data in await reader.db_channel_details():
+                channel_details[chid] = data
+
+            user_mention_data = collections.defaultdict( lambda: collections.defaultdict(list) ) # { uid -> { chid -> [ (msgid,data) ] } }
+            for dt, uid, chid, msgid, data in await reader.db_user_mentions_all():
+                user_mention_data[uid][chid].append( (msgid, data) )
+
+            for uid, inchandict in user_mention_data.items():
+                if len(inchandict) > 1:
+                    print(f"User {uid} seen in multiple channels:")
+                    print('  user details: ', await gramgrab.interesting_keys( gramgrab.getget( user_details, uid, 'data') ) )
+                    for chid, msg_data in inchandict.items():
+                        #print( '   in channel: ', chid, channel_details.get(chid, None) )
+                        print( '  in channel:   ', await gramgrab.interesting_keys( channel_details.get(chid, None) ) )
+                        #print( '    mentions:   ', getget(umd, uid, chid) )
+
+
+        if args.full_users_jsonl:
+            print('Summarizing users in multiple channels (note: includes duplicates)')
+
+            for recorded_at, uid, data in await reader.db_user_full():
+                dict_dt_replace_inplace(     data )
+                dict_byteval_remove_inplace( data ) # mostly image data anyway
+                print( json.dumps(data) )
+
+
+        if args.channel_details_jsonl:
+            for dt, chid, data in await reader.db_channel_details():
+                dict_dt_replace_inplace(     data )
+                dict_byteval_remove_inplace( data ) # mostly image data anyway
+                print( json.dumps(data) )
+                
+
+        #if args.all_messages_jsonl:
+        #    pass
+
+
+        if args.media_postlist:
+            print('saving list of media hashes that were posted in different channels')
+            
+            ## With message it was on 
+            #count = collections.defaultdict(list)
+            #messages_with_media = await reader.db_media_list()
+            #for chid, msgid, sha1hash in messages_with_media:
+            #    count[sha1hash].append( (chid, msgid) )
+            #for sha1hash, l in count.items():
+            #    if len(l) > 1:
+            #        for chid, msgid in l:
+            #            print(f'{sha1hash}\t{chid}\t{msgid}') # maybe add channel title
+
+            ## Just mention it was posted
+            count = collections.defaultdict(set)
+            messages_with_media = await reader.db_media_list()
+            for chid, msgid, sha1hash in messages_with_media:
+                count[sha1hash].add( chid )
+            for sha1hash, l in count.items():
+                if len(l) > 1:
+                    for chid in l:
+                        print(f'{sha1hash}\t{chid}') # maybe add channel title
+
+
+        if args.media_save:
+            print('saving media')
+
+            if not os.path.exists('media'):
+                os.mkdir('media')
+
+            messages_with_media = await reader.db_media_list()
+            print(f'INFO about to save {len(messages_with_media)} media files')
+            for chid, msgid in messages_with_media:
+                suggested_path, data = await reader.db_media_formessage(chid, msgid)
+                if data is not None:
+                    print( chid, msgid, suggested_path, len(data) )
+
+                    #CONSIDER: sanitize suggested_path (it comes from our own code, though)
+                    #TODO: have fallback for when suggested_path is empty
+                    write_path = os.path.join( 'media', suggested_path )
+                    if os.path.exists( write_path ):
+                        print("WARN: refusing to ovewrite %r"%write_path)
+                    else:
+                        with open( write_path, 'wb' ) as f:
+                            f.write( data )
+
+
+
+def main():
+    " Exists in part as entry point for project script "
+    asyncio.run( work() )
+
+
+if __name__ == '__main__':
+    main()
