@@ -1,5 +1,6 @@
 
 import os
+import sys
 import argparse
 import collections
 import asyncio
@@ -19,6 +20,7 @@ def dict_dt_replace_inplace(d, isolike:bool=True):
     """ Takes a dict,
         does an in-place replacement of datetime, with either an ISO8601-like string, or a unix timestamp float.
 
+        Recurses into dicts and list-of-dicts
     """
     for k, v in d.items():
         if isinstance(v, dict):
@@ -35,6 +37,11 @@ def dict_dt_replace_inplace(d, isolike:bool=True):
 
 
 def dict_byteval_remove_inplace(d):
+    """ Takes a dict,
+        does an in-place removal of items that have byte values.
+        
+        Recurses into dicts and list-of-dicts
+    """
     keys_to_remove = []
     for k, v in d.items():
         if isinstance(v, dict):
@@ -48,19 +55,10 @@ def dict_byteval_remove_inplace(d):
     for rk in keys_to_remove:
         d.pop(rk)
 
-#test = {
-#    'd':'',
-#    'b':b'',
-#    'a':datetime.datetime.now(),
-#    1:{'d':datetime.datetime.now(),'q':b'q'},
-#}
-#dict_byteval_remove_inplace(test)
-#test
-#
-#dict_dt_replace_inplace(test, False)
-#test
 
 
+
+#####  FETCHER  ###############################################################
 
 async def fetcher_work():    
 
@@ -69,6 +67,13 @@ async def fetcher_work():
             description="Telegram OSINT and backup tool",
             #usage="%(prog)s [options] pdf_file",
         )
+
+    parser.add_argument(
+        "--list-my-dialogs",
+        default=False,
+        action='store_true',
+        help="List the dialogs - the same list you'ld see in the app, including private chats you are part of.",
+    )
 
     parser.add_argument(
         "--ch",
@@ -134,20 +139,16 @@ async def fetcher_work():
     #    help="",
     #)
 
-    parser.add_argument('-v', '--verbose', action='count', default=0)
+    # TODO: add 'slow down' argument (wait_time?)
+
+
+    parser.add_argument('-v', '--verbose', action='count', default=1)
 
 
     args = parser.parse_args()
 
     channel_refs = args.ch
     #print(args)
-
-
-    if len(args.ch) == 0:
-        raise ValueError("No channel specified")
-
-    if args.verbose==0:
-        print("INFO supply -v argument if you want to see updates while fetching")
 
 
     ## Get account details into environment, if it's there    
@@ -168,9 +169,40 @@ async def fetcher_work():
         raise ValueError('Did not get get login details from environment') # A nicer error than we'd otherwise get
 
 
+    if args.verbose==0:
+        print("INFO supply -v argument if you want to see updates while fetching")
+
 
     ## connect
     async with gramgrab.EasyConnect(TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_PHONENUM) as ec:
+
+        if args.list_my_dialogs:
+            for dia in await ec.client.get_dialogs():
+                # A dialog is a user-specific view on a peer, and wraps in some extra details. 
+                # We care about the peer, which is in .entity
+                edict = dia.entity.to_dict() 
+                #pprint.pprint(edict)
+                typ = edict['_']
+                extra = ''
+                if typ=='Channel':
+                    lid = -( 1000000000000 + edict['id'])
+                    if edict['username'] is None:
+                        extra+='private '
+                    if edict['broadcast']:
+                        extra+='broadcast '
+                elif typ=='Chat':
+                    lid = -edict['id']
+                elif typ=='User':
+                    lid = edict['id']
+                print('INFO dialog to  %-25s  %15s    %s'%(extra+typ, lid,  dia.name))
+                #print(dia.entity)
+                #print( await gramgrab.interesting_keys(dia.entity) )
+
+
+        if len(args.ch) == 0:
+            print("ERROR: No channel(s) specified to fetch")
+            sys.exit(0)
+
 
         ## resolve channel references (id or name) to entities
         channel_entities = [] # TODO: make dict so we don't add the same thing twice?
@@ -228,7 +260,7 @@ async def fetcher_work():
 
 
 
-
+#####  READER  ###############################################################
 
 async def reader_work():    
 
