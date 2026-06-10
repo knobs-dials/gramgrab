@@ -97,12 +97,13 @@ async def interesting_keys(ob, simplify=True):
 
 async def full_entity_details(client, ent): # CONSIDER: renaming
     ''' Given a entity object we can fetch more about, try to do so.
+
         Specifically:
         - for User,    do a GetFullUserRequest
         - for Chat,    do a GetFullChatRequest
         - for Channel, do a GetFullChannelRequest
 
-        Used by 
+        Currently used by 
         - fetch_messages(), for the chat/channel,
         - get_full_user_details(), for users
 
@@ -150,8 +151,7 @@ def getget(d, k1, k2):
     d2 = d.get(k1, None)
     if d2 is None:
         return None
-    # d2 is assumed to be a dict-like
-    return d2.get(k2, None)
+    return d2.get(k2, None)  # d2 is assumed to be a dict-like
 
 
 
@@ -165,6 +165,8 @@ class EasyConnect:
         (specifically an async context manager, because most things around here are async)
 
         Implementation currently focuses on interactive user login.
+
+        The password and code interaction is interactive.
     '''
     def __init__(self, api_id:str, api_hash:str, phonenum:str):
         """ You will need 
@@ -267,6 +269,9 @@ class Fetcher:
         self.users_from_posts          = users_from_posts
         self.users_from_reactions      = users_from_reactions
         self.fetch_full_users          = fetch_full_users            
+
+        self.wait_time                 = 0.5 # how long between iter_messages requests. If you set this below 1, do expect to be throttled.
+
         self.mentioned_user_ids        = set()
         self.curfetch_fulled_user_ids  = set()
         self.time_spent_in             = collections.defaultdict(float)
@@ -597,7 +602,7 @@ class Fetcher:
 
                 # CONSIDER: progress bar somehow?
 
-                async for message in self.client.iter_messages(self.ch, min_id=continue_at, wait_time=1, reverse=True, limit=self.fetch_message_limit):
+                async for message in self.client.iter_messages(self.ch, min_id=continue_at, wait_time=self.wait_time, reverse=True, limit=self.fetch_message_limit):
                     start_time_i = time.time()
                     if isinstance(message, telethon.tl.types.Message): 
                         await self.handle_message( message )
