@@ -1070,7 +1070,9 @@ class SQLiteReader:
 
 
     async def db_media_list(self):
-        " Returns which messages we have media for, as a list of (chid, msgid) tuples. "
+        """ Returns which messages we have media for,
+            as a list of (chid, msgid, shaehash) tuples.
+        """
         curs = self.conn.cursor()
         try:
             curs.execute('SELECT chid, msgid, sha1hash FROM media')
