@@ -64,7 +64,7 @@ async def fetcher_work():
 
     ## Argument parsing and
     parser = argparse.ArgumentParser(
-            description="Telegram OSINT and backup tool",
+            description="Telegram backup and OSINT tool",
             #usage="%(prog)s [options] pdf_file",
         )
 
@@ -79,7 +79,7 @@ async def fetcher_work():
         "--ch",
         default=[],
         action='append',
-        help="Chat or channel to use. Can be repeated.",
+        help="Chat or channel to use. Can be repeated to handle multiple in a run.",
     )
 
     parser.add_argument(
@@ -93,7 +93,7 @@ async def fetcher_work():
         "--fetch-media", 
         default=False,
         action='store_true',
-        help="Whether to fetch stored media while iterating messages (image and document only). Takes a moderate amount of time. Default it not to fetch.",
+        help="Whether to fetch stored media (image and document only) while iterating messages. Takes a moderate amount of time. Default is not to fetch.",
     )
 
     #parser.add_argument(
@@ -103,6 +103,7 @@ async def fetcher_work():
     #    help="Whether to also fetch stored media we know exists on already fetched messages, but did not fetch at the time.",
     #)
 
+    #Currently hardcoded to yes
     #parser.add_argument(
     #    "--users-from-posts", 
     #    default=False,
@@ -114,33 +115,38 @@ async def fetcher_work():
         "--users-from-reactions", 
         default=False,
         action='store_true',
-        help="Whether to record seeing users from (emoji) reactions to the messages, while fetching messages. Takes more requests and a little more time. Default is not to do so.",
+        help="For analysis: Whether to record seeing users from (emoji) reactions to the messages, while fetching messages. Takes more requests and a little more time. Default is not to do so.",
     )
 
     parser.add_argument(
         "--fetch-full-users",
         default=False,
         action='store_true',
-        help="Whether to also fetch full user info for every new user we see. Takes a bunch of time.  Default is not to do so.",
+        help="For analysis: Whether to also fetch full user info for every new user we see. Takes a bunch of time.  Default is not to do so.",
     )
 
     #parser.add_argument(
     #    "--fetch-full-users-catchup",
     #    default=False,
     #    action='store_true',
-    #    help="",
+    #    help="For analysis: Like --fetch-full-users, but do so based on users seen in already fetched messages, to complete your knowledge.",
     #)
 
-    # Just an idea right now:
+    ## Just an idea right now:
     #parser.add_argument(
-    #    "--fetch-full-channels-catchup",
+    #    "--fetch-referred-ch-catchup",
     #    default=False,
     #    action='store_true',
-    #    help="",
+    #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards).",
+    #)
+    #parser.add_argument(
+    #    "--fetch-referred-ch-catchup",
+    #    default=False,
+    #    action='store_true',
+    #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards).",
     #)
 
-    # TODO: add 'slow down' argument (wait_time?)
-
+    # CONSIDER: add 'slow down' argument (wait_time?)
 
     parser.add_argument('-v', '--verbose', action='count', default=1)
 
@@ -207,7 +213,7 @@ async def fetcher_work():
         ## resolve channel references (id or name) to entities
         channel_entities = [] # TODO: make dict so we don't add the same thing twice?
         for ch_ref in channel_refs:
-            print('INFO getting peer entity for %r'%ch_ref)
+            print('INFO fetching peer entity for %r'%ch_ref)
 
             try:
                 int(ch_ref)
@@ -215,6 +221,10 @@ async def fetcher_work():
                 print("INFO given chat/channel reference that looks like an integer, resolved to %s"%(await gramgrab.interesting_keys(ch_ent),))
             except ValueError: # not integer
                 ch_ent = await ec.client.get_entity(ch_ref)
+
+            if ch_ent.to_dict()['_'] == 'User':
+                print("WARN we currently do not support fetching from User dialogs")
+                continue
 
             channel_entities.append( ch_ent )
 
@@ -279,7 +289,7 @@ async def reader_work():
         "--edgelists",
         default=False,
         action='store_true',
-        help="save edgelists to edgelists/(id).",
+        help="calculate edge lists",
     )
 
     parser.add_argument(
@@ -304,17 +314,24 @@ async def reader_work():
     )
 
     parser.add_argument(
+        "--messages-jsonl",
+        default=False,
+        action='store_true',
+        help="save messages, one at a time (JSONL to stdout, removing some byte values)",
+    )
+
+    parser.add_argument(
         "--full-users-jsonl",
         default=False,
         action='store_true',
-        help="Save user data, one at a time (JSONL to stdout)",
+        help="Save user data, one at a time (JSONL to stdout, removing some byte values)",
     )
 
     parser.add_argument(
         "--channel-details-jsonl",
         default=False,
         action='store_true',
-        help="Save channel data, one at a time (JSONL to stdout)",
+        help="Save channel data, one at a time (JSONL to stdout, removing some byte values)",
     )
 
     # media post report / crosspost report 
@@ -389,23 +406,29 @@ async def reader_work():
 
 
         if args.full_users_jsonl:
-            print('Summarizing users in multiple channels (note: includes duplicates)')
-
-            for recorded_at, uid, data in await reader.db_user_full():
+            print('Exporting user details (note: includes duplicates)')
+            for _recorded_at, _uid, data in await reader.db_user_full():
                 dict_dt_replace_inplace(     data )
                 dict_byteval_remove_inplace( data ) # mostly image data anyway
                 print( json.dumps(data) )
 
 
         if args.channel_details_jsonl:
-            for dt, chid, data in await reader.db_channel_details():
+            print('Exporting channel details (note: includes duplicates)')
+            for _dt, _chid, data in await reader.db_channel_details():
                 dict_dt_replace_inplace(     data )
                 dict_byteval_remove_inplace( data ) # mostly image data anyway
                 print( json.dumps(data) )
                 
 
-        #if args.all_messages_jsonl:
-        #    pass
+        if args.messages_jsonl:
+            print('Exporting messages')
+            for chid in await reader.db_message_channels(): # sort of an order by
+                for _chid, _msgid, data in await reader.db_messages_all(chid=chid):
+                    dict_dt_replace_inplace(     data )
+                    dict_byteval_remove_inplace( data ) # mostly image data anyway
+                    print( json.dumps(data) )
+
 
 
         if args.media_postlist:
@@ -440,7 +463,7 @@ async def reader_work():
 
             messages_with_media = await reader.db_media_list()
             print(f'INFO about to save {len(messages_with_media)} media files')
-            for chid, msgid in messages_with_media:
+            for chid, msgid,_sha1hash in messages_with_media:
                 suggested_path, data = await reader.db_media_formessage(chid, msgid)
                 if data is not None:
                     print( chid, msgid, suggested_path, len(data) )
