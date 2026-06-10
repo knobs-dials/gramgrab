@@ -15,7 +15,8 @@ while trying to learn another tool like it.
 
 ## Notes on speed (and abuse)
 
-It is your responsibility to comply to the [Telegram API ToS](https://core.telegram.org/api/terms).
+It is your responsibility to comply to the [Telegram API ToS](https://core.telegram.org/api/terms). 
+Also consider consent for non-public channels.
 
 This tool does not send anything, so you won't get your account banned for spamming.
 
@@ -49,15 +50,15 @@ You will need
 
 - your account's phone number
 
-These are expected to be in environment variables `TELEGRAM_API_ID`,  `TELEGRAM_API_HASH`, and `TELEGRAM_PHONENUM`. 
-It might save you some time to put those in a `.env` file, we pick that up.
+- to authenticate the way your account is already configured for
+  The likeliest for you to use is password or code, both seem to work well - though require some interaction.   Further auth methods that require graphical interaction are currently not implemented.
 
 
-The library then gets you to use your account's usual login method.
+More concretely
+- you would set the environment variables `TELEGRAM_API_ID`,  `TELEGRAM_API_HASH`, and `TELEGRAM_PHONENUM`. 
+  We pick up `.env` contents so it might save you some time to put them in there.
 
-The likeliest for you to use is password or code, both seem to work well - though require some interaction.   Further auth methods that require graphical interaction are currently not implemented.
-
-The library saves a token that means you should not need to authenticate every run.
+- The library saves a token (in the `.session` file) that means that on successive runs, you do not need to supply any of that.
 
 > [!WARNING]  
 > Avoid sharing the `gramgrab.session` file, and `.env` file if you use it
@@ -72,7 +73,10 @@ The fetching is done with `gramgrab`.
 Add `-h` for some help.
 
 The minimum you need to supply is `--ch`,
-to specify a channel to fetch, by public name or ID.
+to specify a channel to fetch.
+For public channels, its name or ID will work.
+You can get references (including private ones) with `--list-my-dialogs`
+
 
 By default, we fetch only messages - this is cheap and fast.
 
