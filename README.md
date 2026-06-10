@@ -62,15 +62,18 @@ Some things that require graphical interaction currently do not.
 
 Tje library saves a token that means you should not need to authenticate every run.
 
-Avoid sharing the `gramgrab.session` file, and `.env` file if you use it
+> [!WARNING]  
+> Avoid sharing the `gramgrab.session` file, and `.env` file if you use it
 
 
 ### Telling it what to fetch
 
-NOTE: Session and fetched data will be stored in the current directory, so run it from the same directory every time.
+Note that the session and fetched data will be stored in the current directory,
+so run it from the same directory every time.
 
 
-The fetching is done with `gramgrab`. Add `-h` for some help.
+The fetching is done with `gramgrab`. 
+Add `-h` for some help.
 
 The minimum you need to supply is `--ch`, to specify a channel to fetch, by public name or ID.
 
@@ -112,8 +115,9 @@ you want some analysis.
 
 Whatever works, but most use cases can use public channel names.
 
-Telegram, telethon, and our code add a little flexibility, which means you can also use IDs.
+Telegram, telethon, and our code add a little flexibility, which means you can also use IDs (e.g. -100xxxxxxxx channel IDs).
 You generally should not need to, and there are a few rough edges to this.
+
 
 
 ### "Can you parallelize it?"
