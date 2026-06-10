@@ -72,6 +72,8 @@ Note that the session and fetched data will be stored in the current directory, 
 The fetching is done with `gramgrab`.
 Add `-h` for some help.
 
+### Backup
+
 The minimum you need to supply is `--ch`,
 to specify a channel to fetch.
 For public channels, its name or ID will work.
@@ -79,7 +81,6 @@ You can get references (including private ones) with `--list-my-dialogs`
 
 
 By default, we fetch only messages - this is cheap and fast.
-
 
 The options for basic use include:
 - `--fetch-media` - whether to also fetch the media (specifically images and documents) attached to the messages we fetch
@@ -89,20 +90,29 @@ Because we can continue previous fetches, things related to messages that are _o
 So decide what you need before you start.
 
 
-For more OSINT-like applications, we have some extras
+### Advanced
+
+For more OSINT-like applications, we provide some extras
+
 - we always save that users have been seen posting messages - it's implied from the message data anyway
+
 - you can optionally add users we have seen do emoji reactions to messages: see `--users-from-reaction`
+
 - `--fetch-full-users`    - also try to do a full user fetch for every user we see.
 
 
 
 ## Read out what you have fetched
 
-If you've fetched things for backup you may want to export what we've fetched, and if you've fetched for OSINT use you want some analysis.
+### Backup
 
-<!--
-`gramparse`
--->
+If you've fetched things for backup you may want to export what we've fetched. You may be mostly interested in: `gramparse --messages-jsonl --media-save`
+
+
+### Advanced
+
+If you've fetched for OSINT use you want some analysis.
+
 
 
 <!--
@@ -110,11 +120,12 @@ If you've fetched things for backup you may want to export what we've fetched, a
 ## Questions
 ### "What exactly should I hand into --ch?"
 
-Whatever works, but most use cases can use public channel names.
+Public channels have names, which may be the easiest.
 
-Telegram, telethon, and our code add a little flexibility, which means you can also use IDs (e.g. -100xxxxxxxx channel IDs).
-You generally should not need to, and there are a few rough edges to this.
-
+Everything has internal IDs, but 
+- this is usually seen through an added convention where -100xxxxxxxx are channel ids, negative without the -100 is chats (and positive is users)
+- Telegram, telethon, and our code add a little flexibility, which means that even if you hand in the internal IDs it ''might'' work, but ther are rough edges to this.
+- this lets you refer to things you do not currently have access to, which will resolve fine, but not do anything else
 
 
 ### "Can you parallelize it?"
@@ -125,18 +136,7 @@ Your account is rate-limited by the telegram servers, and nothing you do client-
 
 ### "Why save media in the database, not files?"
 
-There are a few things we can do more easily while we haven't separated the file data from the metadata of where it came from. Not a lot, though.
+There are a few things we can do slightly more easily while we haven't separated the file data from the information of where it came from. Not a lot, though.
 
 You can save all with `grabparse --media-save`
--->
-
-<!--
-## TODO:
-
-- We make one ugly assumption about peer IDs that should be rewritten, because that will break some future expansion.
-
-- Properly share database code between the fetching and readout
-
-- tests
-
 -->
