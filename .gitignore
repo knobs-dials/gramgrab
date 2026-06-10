@@ -3,3 +3,4 @@
 *.session
 .env
 poetry.lock
+media
