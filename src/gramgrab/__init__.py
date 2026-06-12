@@ -259,9 +259,14 @@ class Fetcher:
         This too would require a subclass, one that actually stores things,
         to be able to tell you _where_ to continue.
 
-        For examples of such a concrete subclass, see SQLiteFetcher below.
-
         The separation of concerns could use some work.
+
+
+        For examples of such a concrete subclass, see SQLiteFetcher below.
+        A postgres equivalent has been suggested.
+        And there are other sensible extensions. Consider e.g.
+        "I have an alert channel and want to occasionally update elasticsearch with that",
+        as you can do that without any further storage.
     """
 
     def __init__( self, client, ch, fetch_message_limit=None, fetch_media=False, fetch_full_users=True, users_from_posts=True, users_from_reactions=True, debug=False ):
@@ -290,7 +295,7 @@ class Fetcher:
         self.users_from_reactions      = users_from_reactions
         self.fetch_full_users          = fetch_full_users            
 
-        self.wait_time                 = 0.5 # how long between iter_messages requests. If you set this below 1, do expect to be throttled.
+        self.wait_time                 = 0.5 # how long between iter_messages requests.  If you set this below 1, do expect to be throttled.
 
         self.mentioned_user_ids        = set()
         self.curfetch_fulled_user_ids  = set()
