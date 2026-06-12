@@ -9,7 +9,6 @@ import pprint
 
 import gramgrab
 
-
 import time, datetime
 
 ## Helpers to massage data for JSON to be happy

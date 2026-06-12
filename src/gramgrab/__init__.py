@@ -1069,3 +1069,41 @@ class SQLiteFetcher(Fetcher, GGDB):
         self.time_spent_in['db'] += time.time() - start_time            
 
 
+    #TODO: implement a way to remember we FAILED to fetch data before re-adding this
+    async def catchup_referred_ch( self, chid=None ):
+        print('INFO Resolving channel sources in forwards(chid=%s)'%chid)
+        channel_ids_known = set()
+        for _dt, known_chid, _data in await self.db_channel_details():
+            channel_ids_known.add( known_chid )
+        print('INFO    have %d known channels'%len(channel_ids_known))
+        channel_id_todo = set()
+        print('INFO    fetching messages and their references')
+        messages = await self.db_messages_all(chid=chid)
+        #print('INFO    ...have %d messages'%len(messages))
+        for _msg_chid, _msgid, data in messages:
+            fwd_from = data.get('fwd_from', None)
+            if fwd_from is not None:
+                #print(fwd_from)
+                from_id = fwd_from.get('from_id', None)
+                if from_id is not None:
+                    if 'channel_id' in from_id: # implicitly filters just for PeerChannel (...sources)
+                        fwd_from_chid = from_id['channel_id']
+                        if fwd_from_chid not in channel_ids_known:
+                            channel_id_todo.add( fwd_from_chid )
+        print('INFO     have %d channels to identify'%(len(channel_id_todo)))
+        for channel_id in channel_id_todo:
+            try:
+                print('INFO catchup_referred_ch - looking up channel %s'%channel_id)
+                #-(id+1000000000000) XXX
+                try:
+                    todo_ent = await self.client.get_entity(channel_id)
+                    edet = await full_entity_details(self.client, todo_ent)   # TODO: is broken I think?
+                    await self.emit( ('channel_details', edet) )
+                except Exception as e:
+                    print('ERROR', e)
+            except Exception as e:
+                print(f"full_entity_details() failed: {e}")
+                raise
+
+
+
