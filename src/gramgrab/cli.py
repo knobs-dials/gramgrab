@@ -74,97 +74,57 @@ DB_FILENAME = 'gramgrab.db'
 
 async def fetcher_work():    
 
-    ## Argument parsing and
-    parser = argparse.ArgumentParser(
-            description="Telegram backup and OSINT tool",
-            #usage="%(prog)s [options] pdf_file",
-        )
+    ## Argument parsing
+    parser = argparse.ArgumentParser( description="Telegram backup and OSINT tool" )
 
-    parser.add_argument(
-        "--list-my-dialogs",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--list-my-dialogs",      default=False, action='store_true',
         help="List the dialogs - the same list you'ld see in the app, including private chats you are part of.",
     )
 
-    parser.add_argument(
-        "--ch",
-        default=[],
-        action='append',
+    parser.add_argument( "--ch",                   default=[],    action='append',
         help="Chat or channel to use. Can be repeated to handle multiple in a run.",
     )
 
-    parser.add_argument(
-        "--ch-catchup",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--ch-catchup",           default=False, action='store_true',
         help="Acts as if we added --ch for every channel we already have messages for.",
     )
 
-    parser.add_argument(
-        "--message-limit", 
-        default=None,
-        type=int,
+    parser.add_argument( "--message-limit",        default=None,  type=int,
         help="Fetch at most this many messages in one run. Useful to be more gentle, and during debugging. Default is no limit.",
     )
 
-    parser.add_argument(
-        "--fetch-media", 
-        default=False,
-        action='store_true',
+    parser.add_argument( "--fetch-media",          default=False, action='store_true',
         help="Whether to fetch stored media (image and document only) while iterating messages. Takes a moderate amount of time. Default is not to fetch.",
     )
 
-    #parser.add_argument(
-    #    "--fetch-media-catchup", 
-    #    default=False,
-    #    action='store_true',
+    #parser.add_argument("--fetch-media-catchup", default=False, action='store_true',
     #    help="Whether to also fetch stored media we know exists on already fetched messages, but did not fetch at the time.",
     #)
 
     #Currently hardcoded to yes
-    #parser.add_argument(
-    #    "--users-from-posts", 
-    #    default=False,
-    #    action='store_true',
+    #parser.add_argument( "--users-from-posts",    default=False, action='store_true',
     #    help="Whether to recording seeing users on messages we fetched",
     #)
 
-    parser.add_argument(
-        "--users-from-reactions", 
-        default=False,
-        action='store_true',
+    parser.add_argument( "--users-from-reactions", default=False, action='store_true',
         help="For analysis: Whether to record seeing users from (emoji) reactions to the messages, while fetching messages. Takes more requests and a little more time. Default is not to do so.",
     )
 
-    parser.add_argument(
-        "--fetch-full-users",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--fetch-full-users",     default=False, action='store_true',
         help="For analysis: Whether to also fetch full user info for every new user we see. Takes a bunch of time.  Default is not to do so.",
     )
 
-    #parser.add_argument(
-    #    "--fetch-full-users-catchup",
-    #    default=False,
-    #    action='store_true',
+    #parser.add_argument( "--fetch-full-users-catchup", default=False, action='store_true',
     #    help="For analysis: Like --fetch-full-users, but do so based on users seen in already fetched messages, to complete your knowledge.",
     #)
 
     ## Just an idea right now:
-    #parser.add_argument(
-    #    "--fetch-referred-ch",
-    #    default=True,
-    #    action='store_false',
+    #parser.add_argument( "--fetch-referred-ch",        default=True, action='store_false',
     #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards), while.",
     #)
-    #parser.add_argument(
-    #    "--fetch-referred-ch-catchup",
-    #    default=False,
-    #    action='store_true',
+    #parser.add_argument( "--fetch-referred-ch-catchup",default=False,action='store_true',
     #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards).",
     #)
-
 
     # CONSIDER: add 'slow down' argument (wait_time?)
 
@@ -313,63 +273,41 @@ async def reader_work():
         description="Telegram OSINT and backup tool - things to do on the fetched data.",
     )
 
-    parser.add_argument(
-        "--count",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--count",                 default=False, action='store_true',
         help="count what we have fetched",
     )
 
-    parser.add_argument(
-        "--edgelists",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--edgelists",             default=False, action='store_true',
         help="calculate edge lists",
     )
 
-    parser.add_argument(
-        "--users-in-multiple-channels",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--users-in-multiple-channels", default=False, action='store_true',
         help="Summarize users seen in multiple channels (JSONL output)",
     )
 
-    parser.add_argument(
-        "--media-postlist",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--media-postlist",        default=False, action='store_true',
         help="",
     )
 
-    parser.add_argument(
-        "--media-save",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--media-save",            default=False, action='store_true',
         help="Save media to media/",
     )
 
-    parser.add_argument(
-        "--messages-jsonl",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--messages-jsonl",        default=False, action='store_true',
         help="save messages, one at a time (JSONL to stdout, removing some byte values)",
     )
 
-    parser.add_argument(
-        "--full-users-jsonl",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--full-users-jsonl",      default=False, action='store_true',
         help="Save user data, one at a time (JSONL to stdout, removing some byte values)",
     )
 
-    parser.add_argument(
-        "--channel-details-jsonl",
-        default=False,
-        action='store_true',
+    parser.add_argument( "--channel-details-jsonl", default=False, action='store_true',
         help="Save channel data, one at a time (JSONL to stdout, removing some byte values)",
     )
 
-    # media post report / crosspost report 
+    #parser.add_argument( "--channel-relations-json",default=False, action='store_true',
+    #    help="Export information on how channels relate - forwards between them, overlapping active users",
+    #)
 
     args = parser.parse_args()
 

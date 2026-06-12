@@ -36,7 +36,7 @@ What you request as a user also has an effect on this, in that different kinds o
 - If you want to run the development code from github, then assuming you use [poetry](https://python-poetry.org/docs/),
   - `git clone` this repository
   - run `poetry install` to have it set up the virtual environment
-  - after that you can e.g. `poetry run gramgrab -h`
+  - after that you can run the main two commands, `poetry run gramgrab -h` and `poetry run gramparse -h`
 
 
 ## Login
