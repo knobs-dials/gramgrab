@@ -36,7 +36,7 @@ What you request as a user also has an effect on this, in that different kinds o
 - If you want to run the development code from github, then assuming you use [poetry](https://python-poetry.org/docs/),
   - `git clone` this repository
   - run `poetry install` to have it set up the virtual environment
-  - after that you can e.g. `poetry run gramparse -h`
+  - after that you can e.g. `poetry run gramgrab -h`
 
 
 ## Login
@@ -45,7 +45,7 @@ You will need
 
 - to supply an API ID and API hash.
   This is not authentication, it is a pair of values that is generally meant to identify to telegram that you are a specific software client.
-  To us it's just a necessary step to create one and use it.
+  For singular uses like this it becomes just a necessary step, to create one and fill it in.
   See https://core.telegram.org/api/obtaining_api_id
 
 - your account's phone number
@@ -64,21 +64,41 @@ More concretely
 > Avoid sharing the `gramgrab.session` file, and `.env` file if you use it
 
 
+
 ## Telling it what to fetch
 
-Note that the session and fetched data will be stored in the current directory, so run repeat fetches (and the reader) from the same directory.
+Note that the session and fetched data will both be stored in the current directory,
+to to reuse the same session, continue the fetching from before, and extract from what you've fetched before,
+run repeat fetches (and the reader) from the same directory.
+
+The fetching is done with `gramgrab`.  Add `-h` for some options.
 
 
-The fetching is done with `gramgrab`.
-Add `-h` for some help.
+### On channel references
+
+The minimum you need to supply is `--ch`, to specify a channel (or chat) to fetch from.
+
+For public channels, its name is probably easiest, its ID will also work.
+
+To fetch IDs for private chats/channels you are a member of, you can use `--list-my-dialogs`
+
+<!--
+this lets you refer to things you do not currently have access to, which will resolve fine, but not do anything else
+
+
+Because Chats, Channels, and Users all are separately assigned (32-bit) pools,
+IDs may exist in each.
+
+As such, external-facing IDs are put into a larger range where they do not, where
+-100xxxxxxxx are channel ids, 
+negative _without_ the 100 is chats,
+and positive is users positive is users
+
+Telegram, telethon, and our code add a little flexibility, which means that even if you hand in the internal IDs it ''might'' work, but ther are rough edges to this.
+-->
+
 
 ### Backup
-
-The minimum you need to supply is `--ch`,
-to specify a channel to fetch.
-For public channels, its name or ID will work.
-You can get references (including private ones) with `--list-my-dialogs`
-
 
 By default, we fetch only messages - this is cheap and fast.
 
@@ -86,7 +106,8 @@ The options for basic use include:
 - `--fetch-media` - whether to also fetch the media (specifically images and documents) attached to the messages we fetch
 
 
-Because we can continue previous fetches, things related to messages that are _optional_ to fetch (e.g. media, reaction list) won't necessarily be fetchable later. 
+As we can continue previous fetches,
+things related to messages that are _optional_ to fetch (e.g. media, reaction list) won't necessarily be fetchable later.
 So decide what you need before you start.
 
 
@@ -113,20 +134,12 @@ If you've fetched things for backup you may want to export what we've fetched. Y
 
 If you've fetched for OSINT use you want some analysis.
 
+This is work in progress, see `gramparse -h`
 
 
 <!--
 
 ## Questions
-### "What exactly should I hand into --ch?"
-
-Public channels have names, which may be the easiest.
-
-Everything has internal IDs, but 
-- this is usually seen through an added convention where -100xxxxxxxx are channel ids, negative without the -100 is chats (and positive is users)
-- Telegram, telethon, and our code add a little flexibility, which means that even if you hand in the internal IDs it ''might'' work, but ther are rough edges to this.
-- this lets you refer to things you do not currently have access to, which will resolve fine, but not do anything else
-
 
 ### "Can you parallelize it?"
 
