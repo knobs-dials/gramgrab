@@ -150,13 +150,10 @@ async def fetcher_work():
     if TELEGRAM_API_ID is None: #  or  TELEGRAM_PHONENUM is None:
         raise ValueError('Did not get get login details from environment (TELEGRAM_API_ID and/or friends missing)') # A nicer error than we'd otherwise get
 
-
     if args.verbose==0:
         print("INFO supply -v argument if you want to see updates while fetching")
 
-
     channel_refs = args.ch
-    #print(args)
 
 
     ## connect
@@ -181,8 +178,6 @@ async def fetcher_work():
                 elif typ == 'User':
                     lid = edict['id']
                 print('INFO dialog to  %-25s  %15s    %r'%(extra+typ, lid,  dia.name))
-                #print(dia.entity)
-                #print( await gramgrab.interesting_keys(dia.entity) )
 
 
         ## resolve channel references (id or name) to entities
@@ -312,6 +307,7 @@ async def reader_work():
     args = parser.parse_args()
 
 
+    # Do the things that were asked of us
     async with gramgrab.GGDB( DB_FILENAME ) as reader:
 
         if args.count:
@@ -343,7 +339,6 @@ async def reader_work():
                             if 'channel_id' in from_id: # implicitly filters just for PeerChannel (...sources)
                                 from_channel_id = from_id['channel_id']
                                 from_channel_title = gramgrab.getget( chan_detail, from_channel_id,'title') # which we often do not know
-                                #print(data)
                                 print( json.dumps({'from_chid':from_channel_id, 'from_title':from_channel_title,   'to_chid':in_chid, 'to_title':to_channel_title, 'to_msgid':msgid, 'date':data.get('date').strftime('%Y-%m-%dT%H:%M:%S%z'), 'message':data.get('message')}) )
                     
 
