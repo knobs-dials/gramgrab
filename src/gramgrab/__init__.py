@@ -34,6 +34,26 @@ def sha1_hex( data:bytes ):
     return sha1h.hexdigest()
 
 
+def internal2external(typ, id):
+    # could check that id is in range
+    if typ.lower() == 'channel':
+        return -( 1000000000000 + id)
+    elif typ.lower() == 'chat':
+        return -id
+    elif typ.lower() == 'user':
+        return id
+
+
+def external2internal(id):
+    # these ranges could be better?
+    if id < -1000000000000:
+        return 'Channel', -(id+1000000000000)
+    elif id < 0:
+        return 'Chat', -id
+    else:
+        return 'User',id
+
+
 async def dict_subset(dd, keys):
     """ Filter dict by keys, mostly supports 'get interesting subset of telegram object attributes'.
         
