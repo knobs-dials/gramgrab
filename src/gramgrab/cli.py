@@ -331,7 +331,7 @@ async def reader_work():
         "--users-in-multiple-channels",
         default=False,
         action='store_true',
-        help="Save media to media/",
+        help="Summarize users seen in multiple channels (JSONL output)",
     )
 
     parser.add_argument(
