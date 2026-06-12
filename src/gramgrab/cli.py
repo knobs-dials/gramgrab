@@ -405,11 +405,8 @@ async def reader_work():
                             if 'channel_id' in from_id: # implicitly filters just for PeerChannel (...sources)
                                 from_channel_id = from_id['channel_id']
                                 from_channel_title = gramgrab.getget( chan_detail, from_channel_id,'title') # which we often do not know
-                                #print("post from ch=%s (%s) posted to ch=%s (%s)"%(
-                                #    from_channel_id, from_channel_title,
-                                #    in_chid,         to_channel_title,
-                                #)) 
-                                print( json.dumps({'from_chid':from_channel_id, 'from_title':from_channel_title,   'to_chid':in_chid, 'to_title':to_channel_title, 'to_msgid':msgid}) )
+                                #print(data)
+                                print( json.dumps({'from_chid':from_channel_id, 'from_title':from_channel_title,   'to_chid':in_chid, 'to_title':to_channel_title, 'to_msgid':msgid, 'date':data.get('date').strftime('%Y-%m-%dT%H:%M:%S%z'), 'message':data.get('message')}) )
                     
 
 
