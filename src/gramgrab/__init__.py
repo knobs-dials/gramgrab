@@ -521,17 +521,17 @@ class Fetcher:
 
 
         if message.fwd_from is not None: # https://core.telegram.org/constructor/messageFwdHeader
-            md['fwd_from'] = await interesting_keys(message.fwd_from) # assume this overwrites what was there
-
             # During fetch, telethon also adds a .forward, 
             # but it's basically just the python-type equivalent of the above,
             # and fwd_from serializes more easily
+            md['fwd_from'] = await interesting_keys(message.fwd_from) # assume this overwrites what was there
 
+
+            #CONSIDER: Anything else to do with it?
             #print( 'fwd_from', md['fwd_from'] )
 
             # Note that fwd_from.from_id is usually either a channel or a user (forward from dialog or chat?)
             from_entity = message.fwd_from.from_id # actually a Peer
-
             if from_entity is not None:
                 from_dict   = getget( md, 'fwd_from', 'from_id') # slightly more convenient
                 #print('INFO forward, from_dict', from_dict)
@@ -564,7 +564,7 @@ class Fetcher:
         #    print("Forwarded from:", getattr(entity, 'title', None) or entity.id)
 
 
-    async def get_full_user_details( self, user ): # CONSIDER adding cached_ to the name,   or augment_ to point out we don't necessarily 
+    async def get_full_user_details( self, user ): # CONSIDER adding complete_cached_ to the name
         ''' Try to get full user details for this user.
 
             This is intended as a 'fetch full user details only for users we have not done that for before'.
@@ -682,47 +682,19 @@ class Fetcher:
 
 
 
-class SQLiteFetcher(Fetcher):
-    ''' Bare Fetcher just emit()s information,
-        but doesn't store it, and exits for encapsulation reasons.
-
-        This expands on that by listening to those emit()s and storing them.
-
-        Additions:
-        - database open and close
-        - emit() is implemented to store in that open database
-        - fetch_messages augmented to 
-          - pick up where message fetching left off ealier
-          - only do full user fetches we didn't already do
-        - some functions to ease database readout
 
 
-        Could stand separation of db and fetching, 
-        because right now you need to connect to telegram 
-        just to read out the db.
-    '''
-    def __init__(self, client, ch, db_path='gramgrab.db', *args, **kwargs):
-        """ 
-            @param client:   A telethon client.
-                             If you use EasyConnect class, you can hand in its .client
-            @param ch:       Channel/chat we will be fetching. 
-                             The database refers to which channel/chat it got things in, so you can fetch multiple channels into it,
-                             but the fetcher instance works on one channel/chat at a time.
-            @param db_path:  Path to the file to open/create the database in.
 
+class GGDB:
+    """ Wrapper for both the writing and reading  with the structure this program uses.
 
-            It is fine to use a database that contains other channels's data,
-            - as most things are separable afterwards,
-            - and there are some analyses (e.g. 'where else is this user active')
-              that are much easier if it's in the same database
-            - though in some use cases it will make more to you to use a database per channel.
-
-
-        """
-        super().__init__(client, ch, *args, **kwargs)
+        Exists in part so that both the fetcher and the just-reading gramparse can share code.
+    """
+    def __init__(self, db_path='gramgrab.db'):
         self.db_path = db_path
-        self.prevfetch_fulled_user_ids = set()
         self.db_open()
+        #self.conn = sqlite3.connect(db_path, timeout=3)
+        #self.conn.execute( "PRAGMA journal_mode = WAL" )
 
 
     def db_open(self, timeout=3.0):
@@ -772,181 +744,6 @@ class SQLiteFetcher(Fetcher):
         else:
             self.conn.rollback() # conditional?
         self.conn.close()
-
-
-    # async context manager, for telethon and sqlite (mostly useful for the sqlite commit before close)
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        try:
-            await self.disconnect()
-        except:
-            pass
-        try:
-            await self.db_close( commit=True )
-        except:
-            pass
-
-
-    ######## fetch data into database #############
-    async def fetch_messages( self, start_at=0 ):
-        '  '
-        #if self.debug:
-        #    print('fetch_messages')
-
-        # TODO: think about whether this is the best spot for this,
-        #       or whether it should be 'do this once on first need'
-        if self.fetch_full_users:
-            print("INFO prevuser - fetching knowledge of users we already looked up...")
-            curs = self.conn.cursor()
-            start_time = time.time()
-            # CONSIDER: making it a map from uid to recent fetch, so we can have "refresh if older than" behaviour
-            try:
-                curs.execute('SELECT distinct uid FROM user_full')
-                rows = curs.fetchall()
-            finally:
-                curs.close()
-            for uid, in rows:
-                self.prevfetch_fulled_user_ids.add( int(uid) )
-
-            took = time.time() - start_time
-            self.time_spent_in['db_fullfetch'] += took
-            print("INFO prevuser - ...%d user IDs loaded (in %.2f sec)"%(len(self.prevfetch_fulled_user_ids),took))
-            #print(self.prevfetch_fulled_user_ids)            
-
-
-        start_time = time.time() 
-        curs = self.conn.cursor()
-        maxmid = None
-        try:
-            curs.execute('SELECT count(msgid),max(msgid) FROM messages WHERE chid=?',(self.ch.id,))
-            count, maxmid, = curs.fetchone()
-        finally:
-            curs.close()
-        
-        if maxmid is None:
-            maxmid = 0
-        self.time_spent_in['db'] += time.time() - start_time
-
-        print("INFO currently have %d messages for %s(%s)"%(
-            count, 
-            self.ch.to_dict()['_'],  # Channel / Chat
-            self.ch.id)
-        )
-
-        # database stuff is handled/separated by handling emit()s
-        await super().fetch_messages( start_at=maxmid )
-
-        await self._db_commit()
-
-
-    async def emit( self, tup ): 
-        ''' overrides emit with something that knows how to store it 
-            This is an example for sqlite to make a quick file store, 
-            you might consider postgres, elasticsearch, or others.
-        '''
-        #print('SF.emit', tup)
-        start_time = time.time()
-
-        what = tup[0]
-        if what == 'message':
-            channelid, messageid, dd = tup[1:]
-            self.conn.execute('INSERT INTO messages (chid, msgid, data) VALUES (?,?,?)', 
-                (channelid, messageid, msgpack.dumps(dd, datetime=True))
-            )
-
-        elif what == 'user_mentioned': # assumes dict presence of keys 'uid', 'chid', and 'message'
-            dd = tup[1]
-            self.conn.execute('INSERT INTO noticed_user (uid, chid, msgid, data) VALUES (?,?,?,?)', 
-                (dd['uid'], dd.get('chid'), dd.get('message',None), msgpack.dumps(dd, datetime=True))
-            )
-        elif what == 'user_full': # assumes presence of keys 'user_id' and 'message'
-            dd = tup[1]
-            self.conn.execute('INSERT INTO user_full (uid, data) VALUES (?,?)', 
-                (dd['uid'], msgpack.dumps(dd, datetime=True))
-            )
-
-        elif what == 'channel_details': # assumes dict presence of key 'id'
-            dd = tup[1]
-            #print('chd',dd)
-            self.conn.execute('INSERT INTO noticed_channel (chid, data) VALUES (?,?)', 
-                (dd['id'], msgpack.dumps(dd, datetime=True))
-            )
-
-        elif what == 'media':# assumes presence of keys 'channel', 'message', 'suggested_path', and 'data'
-            dd = tup[1]
-            self.conn.execute('INSERT INTO media (chid, msgid, suggested_path, sha1hash, data) VALUES (?,?,?,?,?)', 
-                (dd['channel'], dd['message'], dd['suggested_path'], sha1_hex(dd['data']), dd['data'])
-            )
-
-        else:
-            raise ValueError("emit() doesn't know what to do with {what} - {tup}")
-
-        #CONSIDER: occasional commit, this is currently closer to an autocommit
-        #await self._db_commit(checkpoint=False)
-
-        self.time_spent_in['db'] += time.time() - start_time            
-
-
-
-    # CONSIDER: maybe we don't need this "fetching things we previouslt didn't" ?
-    # async def catchup_media_fetches( self, start_at=0 ):
-    #     if self.fetch_media: 
-    #         print("Checking for media we didn't fetch before...")
-    #         cursor = self.conn.cursor()
-    #         cursor.execute('SELECT msgid, data  FROM messages WHERE chid=?', (ch.id,)) # TODO: use proper ID 
-
-    #         rows = cursor.fetchall()
-    #         fetch_media_for_message_ids = []
-    #         for msgid, data in rows:
-    #             data_dict = msgpack.unpackb(data, timestamp=3, strict_map_key=False)
-    #             media = data_dict.get('media')
-    #             if media is not None:
-    #                 # mirroring what handle_message_media won't ignore
-    #                 if media['_'] in ('MessageMediaPhoto', 'MessageMediaDocument'):
-    #                     # unless we have an index, we should maybe select all msgid for chid once, not many times?
-    #                     cursor.execute('SELECT count(1)  FROM media  WHERE chid=? AND msgid=?', (ch.id, msgid))
-    #                     have, = cursor.fetchone()
-    #                     if have==0:
-    #                         print( 'WOULDFETCH', msgid, data_dict )
-    #                         fetch_media_for_message_ids.append(msgid)
-    #                     #else:
-    #                     #    print( 'ALREADYHAVE', msgid, data_dict )
-
-    #                 #else:
-    #                 #    print( 'IGNORING', media['_'], msgid, data_dict )
-    
-    #         while len(fetch_media_for_message_ids) > 0:
-    #             print( f" {len(fetch_media_for_message_ids)} left " )
-    #             fetch_now = fetch_media_for_message_ids[:50]
-    #             fetch_media_for_message_ids = fetch_media_for_message_ids[50:]
-
-    #             msgs = await self.client.get_messages(ch, ids=fetch_now)
-    #             while len(msgs) > 0:
-    #                 print( f" {len(msgs)} left in batch" )
-    #                 try:
-    #                     print("Fetching media for message")
-    #                     await self.handle_message_media( msgs[0] )
-    #                     msgs.pop(0) # only remove on success, because of the wrapping flood logic
-    #                 except telethon.errors.FloodWaitError as fwe:
-    #                     wait_time = 5 + fwe.seconds
-    #                     print(f"INFO media - got a FloodWaitError, sleeping for {wait_time} seconds")
-    #                     await asyncio.sleep( wait_time )
-
-
-
-
-
-
-class SQLiteReader:
-    ''' TODO: properly share code with SQLiteFetcher
-
-    '''
-    def __init__(self, db_path='gramgrab.db'):
-        self.conn = sqlite3.connect(db_path, timeout=3)
-        self.conn.execute( "PRAGMA journal_mode = WAL" )
-
 
 
     # async context manager, for sqlite connection close
@@ -1081,6 +878,8 @@ class SQLiteReader:
     async def db_channel_details(self):
         """ Note that these are snapshots of their metadata, so that you can notice changes.
             If you do not care, any one of them will do 
+
+            Returns sequence of (recorded_at, chid, data)
         """
         curs = self.conn.cursor()
         try:
@@ -1128,5 +927,145 @@ class SQLiteReader:
         chid, suggested_path, data = rows[0]
 
         return suggested_path, data
+
+
+
+
+
+class SQLiteFetcher(Fetcher, GGDB):
+    ''' Bare Fetcher just emit()s information,
+        but doesn't store it, and exits for encapsulation reasons.
+
+        This expands on that by listening to those emit()s and storing them,
+        and some functionality that only makes sense when storing.
+
+        Additions:
+        - database open and close
+        - emit() is implemented to store in that open database
+        - fetch_messages augmented to 
+          - pick up where message fetching left off ealier
+          - only do full user fetches we didn't already do
+        - some functions to ease database readout
+
+
+        Could stand separation of db and fetching, 
+        because right now you need to connect to telegram 
+        just to read out the db.
+    '''
+    def __init__(self, client, ch, db_path='gramgrab.db', *args, **kwargs):
+        """ 
+            @param client:   A telethon client.
+                             If you use EasyConnect class, you can hand in its .client
+            @param ch:       Channel/chat we will be fetching. 
+                             The database refers to which channel/chat it got things in, so you can fetch multiple channels into it,
+                             but the fetcher instance works on one channel/chat at a time.
+            @param db_path:  Path to the file to open/create the database in.
+
+
+            It is fine to use a database that contains other channels's data,
+            - as most things are separable afterwards,
+            - and there are some analyses (e.g. 'where else is this user active')
+              that are much easier if it's in the same database
+            - though in some use cases it will make more to you to use a database per channel.
+
+
+        """
+        Fetcher.__init__(self, client, ch, *args, **kwargs)
+        GGDB.__init__(   self, db_path)
+        #self.db_path = db_path
+        self.prevfetch_fulled_user_ids = set()
+        #self.db_open()
+
+
+    async def fetch_messages( self, start_at=0 ):
+        '  '
+        #if self.debug:
+        #    print('fetch_messages')
+
+        # TODO: think about whether this is the best spot for this,
+        #       or whether it should be 'do this once on first need'
+        if self.fetch_full_users:
+            print("INFO prevuser - fetching knowledge of users we already looked up...")
+            curs = self.conn.cursor()
+            start_time = time.time()
+            # CONSIDER: making it a map from uid to recent fetch, so we can have "refresh if older than" behaviour
+            try:
+                curs.execute('SELECT distinct uid FROM user_full')
+                rows = curs.fetchall()
+            finally:
+                curs.close()
+            for uid, in rows:
+                self.prevfetch_fulled_user_ids.add( int(uid) )
+
+            took = time.time() - start_time
+            self.time_spent_in['db_fullfetch'] += took
+            print("INFO prevuser - ...%d user IDs loaded (in %.2f sec)"%(len(self.prevfetch_fulled_user_ids),took))
+            #print(self.prevfetch_fulled_user_ids)            
+
+
+        start_time = time.time() 
+        curs = self.conn.cursor()
+        # Figure out what we have, and where to continue from 
+        maxmid = None
+        try:
+            curs.execute('SELECT count(msgid),max(msgid) FROM messages WHERE chid=?',(self.ch.id,))
+            count, maxmid, = curs.fetchone()
+        finally:
+            curs.close()
+        
+        if maxmid is None:
+            maxmid = 0
+        self.time_spent_in['db'] += time.time() - start_time
+        print("INFO currently have %d messages for %s(%s)"%(
+            count, 
+            self.ch.to_dict()['_'],  # Channel / Chat
+            self.ch.id)
+        )
+
+        # database stuff is handled/separated by handling emit()s
+        await super().fetch_messages( start_at=maxmid )
+
+        await self._db_commit()
+
+
+    async def emit( self, tup ): 
+        ''' overrides emit with something that knows how to store it 
+            This is an example for sqlite to make a quick file store, 
+            you might consider postgres, elasticsearch, or others.
+        '''
+        start_time = time.time()
+
+        what = tup[0]
+        if what == 'message':
+            channelid, messageid, dd = tup[1:]
+            self.conn.execute('INSERT INTO messages (chid, msgid, data) VALUES (?,?,?)', 
+                (channelid, messageid, msgpack.dumps(dd, datetime=True))
+            )
+        elif what == 'user_mentioned': # assumes dict presence of keys 'uid', 'chid', and 'message'
+            dd = tup[1]
+            self.conn.execute('INSERT INTO noticed_user (uid, chid, msgid, data) VALUES (?,?,?,?)', 
+                (dd['uid'], dd.get('chid'), dd.get('message',None), msgpack.dumps(dd, datetime=True))
+            )
+        elif what == 'user_full': # assumes presence of keys 'user_id' and 'message'
+            dd = tup[1]
+            self.conn.execute('INSERT INTO user_full (uid, data) VALUES (?,?)', 
+                (dd['uid'], msgpack.dumps(dd, datetime=True))
+            )
+        elif what == 'channel_details': # assumes dict presence of key 'id'
+            dd = tup[1]
+            #print('chd',dd)
+            self.conn.execute('INSERT INTO noticed_channel (chid, data) VALUES (?,?)', 
+                (dd['id'], msgpack.dumps(dd, datetime=True))
+            )
+        elif what == 'media':# assumes presence of keys 'channel', 'message', 'suggested_path', and 'data'
+            dd = tup[1]
+            self.conn.execute('INSERT INTO media (chid, msgid, suggested_path, sha1hash, data) VALUES (?,?,?,?,?)', 
+                (dd['channel'], dd['message'], dd['suggested_path'], sha1_hex(dd['data']), dd['data'])
+            )
+        else:
+            raise ValueError("emit() doesn't know what to do with {what} - {tup}")
+        #CONSIDER: occasional commit, this is currently closer to an autocommit
+        #await self._db_commit(checkpoint=False)
+        self.time_spent_in['db'] += time.time() - start_time            
 
 
