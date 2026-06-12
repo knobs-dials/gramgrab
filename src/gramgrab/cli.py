@@ -57,7 +57,20 @@ def dict_byteval_remove_inplace(d):
 
 
 
+# Until there is reason to make this a parameter, this is effectively a hardcoded constant
+DB_FILENAME = 'gramgrab.db' 
+
+
+
+
+
+
+
+
+
+
 #####  FETCHER  ###############################################################
+
 
 async def fetcher_work():    
 
@@ -79,6 +92,13 @@ async def fetcher_work():
         default=[],
         action='append',
         help="Chat or channel to use. Can be repeated to handle multiple in a run.",
+    )
+
+    parser.add_argument(
+        "--ch-catchup",
+        default=False,
+        action='store_true',
+        help="Acts as if we added --ch for every channel we already have messages for.",
     )
 
     parser.add_argument(
@@ -133,10 +153,10 @@ async def fetcher_work():
 
     ## Just an idea right now:
     #parser.add_argument(
-    #    "--fetch-referred-ch-catchup",
-    #    default=False,
-    #    action='store_true',
-    #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards).",
+    #    "--fetch-referred-ch",
+    #    default=True,
+    #    action='store_false',
+    #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards), while.",
     #)
     #parser.add_argument(
     #    "--fetch-referred-ch-catchup",
@@ -145,15 +165,12 @@ async def fetcher_work():
     #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards).",
     #)
 
+
     # CONSIDER: add 'slow down' argument (wait_time?)
 
     parser.add_argument('-v', '--verbose', action='count', default=1)
 
-
     args = parser.parse_args()
-
-    channel_refs = args.ch
-    #print(args)
 
 
     ## Get account details into environment, if it's there    
@@ -171,11 +188,15 @@ async def fetcher_work():
     # warning: you probably don't want to print those, in case you ever share this
 
     if TELEGRAM_API_ID is None: #  or  TELEGRAM_PHONENUM is None:
-        raise ValueError('Did not get get login details from environment') # A nicer error than we'd otherwise get
+        raise ValueError('Did not get get login details from environment (TELEGRAM_API_ID and/or friends missing)') # A nicer error than we'd otherwise get
 
 
     if args.verbose==0:
         print("INFO supply -v argument if you want to see updates while fetching")
+
+
+    channel_refs = args.ch
+    #print(args)
 
 
     ## connect
@@ -189,24 +210,19 @@ async def fetcher_work():
                 #pprint.pprint(edict)
                 typ = edict['_']
                 extra = ''
-                if typ=='Channel':
+                if typ == 'Channel':
                     lid = -( 1000000000000 + edict['id'])
                     if edict['username'] is None:
                         extra+='private '
                     if edict['broadcast']:
                         extra+='broadcast '
-                elif typ=='Chat':
+                elif typ == 'Chat':
                     lid = -edict['id']
-                elif typ=='User':
+                elif typ == 'User':
                     lid = edict['id']
-                print('INFO dialog to  %-25s  %15s    %s'%(extra+typ, lid,  dia.name))
+                print('INFO dialog to  %-25s  %15s    %r'%(extra+typ, lid,  dia.name))
                 #print(dia.entity)
                 #print( await gramgrab.interesting_keys(dia.entity) )
-
-
-        if len(args.ch) == 0:
-            print("ERROR: No channel(s) specified to fetch")
-            sys.exit(0)
 
 
         ## resolve channel references (id or name) to entities
@@ -238,19 +254,25 @@ async def fetcher_work():
                         print( f"INFO this (id={ch_ent.id}, broadcast={ch_ent.broadcast}, megagroup={ch_ent.megagroup}) has a linked_chat_id ({linked_chat_id}), you might care for that." )
                         #chans.append( await ec.client.get_entity(linked_chat_id) ) # TODO: is that correct or should we instantiate it directly?
                         #ch_details = await gramgrab.full_entity_details(ec.client, await ec.client.get_entity(linked_chat_id) )
+        if args.ch_catchup:
+            async with gramgrab.GGDB( DB_FILENAME ) as reader:
+                for have_channel in await reader.db_message_channels():
+                    hch_ent = await ec.client.get_entity( have_channel )
+                    print('INFO adding channel we already had messages for: %s'%(await gramgrab.interesting_keys( hch_ent), ))
+                    channel_entities.append( hch_ent )
+
+        if len(channel_entities) == 0:
+            print("ERROR: No channel(s) specified to fetch")
+            sys.exit(0)
 
 
-        ## actual fetching work
-        for ch in channel_entities:
-            print(f"\n======= {ch.id} - {ch.title} =======") # TODO: check that Channel and Chat both have a .title
-
-            #ik = await gramgrab.interesting_keys(ch)
-            #pprint.pprint(ik)
-            #print( f"FETCHING for channel {ik}" )
+        ## actual fetching work, per channel/chat
+        for ch_ent in channel_entities:
+            print(f"\n======= {ch_ent.id} - {ch_ent.title} =======") # TODO: check that Channel and Chat both have a .title
             fetcher = gramgrab.SQLiteFetcher( 
                 ec.client,
-                ch,
-                'gramgrab.db',
+                ch_ent,
+                DB_FILENAME,
                 fetch_message_limit  = args.message_limit,
                 fetch_media          = args.fetch_media,
                 users_from_posts     = True, #args.users_from_posts,
@@ -259,12 +281,26 @@ async def fetcher_work():
                 debug=args.verbose )
             try:
                 await fetcher.fetch_messages()
+
+                #if args.fetch_referred_ch_catchup:
+                await fetcher.catchup_referred_ch( ch_ent.id )
             finally:
                 await fetcher.db_close( commit=True ) # get the journal merged earlier rather than later
 
             if fetcher.debug >= 1:
                 for what, howmuch in fetcher.time_spent_in.items():
                     print( f'INFO spent {howmuch:5.1f} seconds in {what}' )
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -338,22 +374,22 @@ async def reader_work():
     args = parser.parse_args()
 
 
-    async with gramgrab.SQLiteReader('gramgrab.db') as reader:
+    async with gramgrab.GGDB( DB_FILENAME ) as reader:
 
         if args.count:
-            print('Counting what we have...')
+            print('Counting what we have...', file=sys.stderr)
             pprint.pprint( await reader.db_counts_all() )
 
 
         if args.edgelists:
-            print('creating edge lists')
+            print('creating edge lists', file=sys.stderr)
             # edgelist, as in the other chats a message was forwarded from - meant to find related chats
 
             chan_detail = {}
             for dt, chid, data in await reader.db_channel_details(): # we will get multiple per channel, but any one will do
                 chan_detail[chid] = data
 
-            for chid in await reader.db_message_channels(): # sort of an order by
+            for chid in await reader.db_message_channels(): # sort of an group by
                 #print(' -- %s -- '%chid)
                 #print( chan_detail.get(chid,None).get('title') )
 
@@ -366,7 +402,6 @@ async def reader_work():
                     if fwd_from is not None:
                         from_id = fwd_from.get('from_id', None)
                         if from_id is not None: # is that even possible?
-                            
                             if 'channel_id' in from_id: # implicitly filters just for PeerChannel (...sources)
                                 from_channel_id = from_id['channel_id']
                                 from_channel_title = gramgrab.getget( chan_detail, from_channel_id,'title') # which we often do not know
@@ -374,13 +409,12 @@ async def reader_work():
                                 #    from_channel_id, from_channel_title,
                                 #    in_chid,         to_channel_title,
                                 #)) 
-                            print( json.dumps({'from_chid':from_channel_id, 'from_title':from_channel_title,   'to_chid':in_chid, 'to_title':to_channel_title, 'to_msgid':msgid}) )
-                                
-
+                                print( json.dumps({'from_chid':from_channel_id, 'from_title':from_channel_title,   'to_chid':in_chid, 'to_title':to_channel_title, 'to_msgid':msgid}) )
                     
 
+
         if args.users_in_multiple_channels:
-            print('Summarizing users in multiple channels')
+            print('Summarizing users in multiple channels', file=sys.stderr)
 
             user_details = {}
             for recorded_at, uid, data in await reader.db_user_full():
@@ -405,7 +439,7 @@ async def reader_work():
 
 
         if args.full_users_jsonl:
-            print('Exporting user details (note: includes duplicates)')
+            print('Exporting user details (note: includes duplicates)', file=sys.stderr)
             for _recorded_at, _uid, data in await reader.db_user_full():
                 dict_dt_replace_inplace(     data )
                 dict_byteval_remove_inplace( data ) # mostly image data anyway
@@ -413,7 +447,7 @@ async def reader_work():
 
 
         if args.channel_details_jsonl:
-            print('Exporting channel details (note: includes duplicates)')
+            print('Exporting channel details (note: includes duplicates)', file=sys.stderr)
             for _dt, _chid, data in await reader.db_channel_details():
                 dict_dt_replace_inplace(     data )
                 dict_byteval_remove_inplace( data ) # mostly image data anyway
@@ -421,8 +455,8 @@ async def reader_work():
                 
 
         if args.messages_jsonl:
-            print('Exporting messages')
-            for chid in await reader.db_message_channels(): # sort of an order by
+            print('Exporting messages', file=sys.stderr)
+            for chid in await reader.db_message_channels(): # sort of an group by
                 for _chid, _msgid, data in await reader.db_messages_all(chid=chid):
                     dict_dt_replace_inplace(     data )
                     dict_byteval_remove_inplace( data ) # mostly image data anyway
@@ -431,9 +465,9 @@ async def reader_work():
 
 
         if args.media_postlist:
-            print('saving list of media hashes that were posted in different channels')
+            print('saving list of media hashes that were posted in different channels', file=sys.stderr)
             
-            ## With message it was on 
+            ## also mention ech message it was on   (e.g. repeats, replies?)
             #count = collections.defaultdict(list)
             #messages_with_media = await reader.db_media_list()
             #for chid, msgid, sha1hash in messages_with_media:
@@ -455,7 +489,7 @@ async def reader_work():
 
 
         if args.media_save:
-            print('saving media')
+            print('saving media', file=sys.stderr)
 
             if not os.path.exists('media'):
                 os.mkdir('media')
@@ -476,6 +510,17 @@ async def reader_work():
                         with open( write_path, 'wb' ) as f:
                             f.write( data )
 
+
+
+
+
+
+
+
+
+
+
+# Entry points for project scripts
 
 def reader_main():
     import asyncio
