@@ -1090,7 +1090,7 @@ class SQLiteFetcher(Fetcher, GGDB):
                         fwd_from_chid = from_id['channel_id']
                         if fwd_from_chid not in channel_ids_known:
                             channel_id_todo.add( fwd_from_chid )
-        print('INFO     have %d channels to identify'%(len(channel_id_todo)))
+        print('INFO    have %d channels to identify'%(len(channel_id_todo)))
         for channel_id in channel_id_todo:
             try:
                 print('INFO catchup_referred_ch - looking up channel %s'%channel_id)
