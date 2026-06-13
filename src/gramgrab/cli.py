@@ -131,6 +131,11 @@ async def fetcher_work():
 
     parser.add_argument('-v', '--verbose', action='count', default=1)
 
+    if len(sys.argv) == 1:
+        print("ERROR: No arguments supplied\n")
+        parser.print_help()
+        sys.exit(-1)
+
     args = parser.parse_args()
 
 
@@ -304,6 +309,11 @@ async def reader_work():
     parser.add_argument( "--channel-relations-json",default=False, action='store_true',
         help="Export information on how channels relate - forwards between them, overlapping active users",
     )
+
+    if len(sys.argv) == 1:
+        print("ERROR: No arguments supplied\n")
+        parser.print_help()
+        sys.exit(-1)
 
     args = parser.parse_args()
 
