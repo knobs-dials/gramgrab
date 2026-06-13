@@ -312,7 +312,7 @@ async def reader_work():
     async with gramgrab.GGDB( DB_FILENAME ) as reader:
 
         if args.count:
-            print('Counting what we have...', file=sys.stderr)
+            print('INFO Counting what we have...', file=sys.stderr)
             pprint.pprint( await reader.db_counts_all() )
 
 
@@ -366,7 +366,7 @@ async def reader_work():
 
 
         if args.users_in_multiple_channels:
-            print('Summarizing users in multiple channels', file=sys.stderr)
+            print('INFO Summarizing users in multiple channels', file=sys.stderr)
 
             user_details = {}
             for recorded_at, uid, data in await reader.db_user_full():
@@ -391,7 +391,7 @@ async def reader_work():
 
 
         if args.full_users_jsonl:
-            print('Exporting user details (note: includes duplicates)', file=sys.stderr)
+            print('INFO Exporting user details (note: includes duplicates)', file=sys.stderr)
             for _recorded_at, _uid, data in await reader.db_user_full():
                 dict_dt_replace_inplace(     data )
                 dict_byteval_remove_inplace( data ) # mostly image data anyway
@@ -399,7 +399,7 @@ async def reader_work():
 
 
         if args.channel_details_jsonl:
-            print('Exporting channel details (note: includes duplicates)', file=sys.stderr)
+            print('INFO Exporting channel details (note: includes duplicates)', file=sys.stderr)
             for _dt, _chid, data in await reader.db_channel_details():
                 dict_dt_replace_inplace(     data )
                 dict_byteval_remove_inplace( data ) # mostly image data anyway
@@ -407,7 +407,7 @@ async def reader_work():
                 
 
         if args.messages_jsonl:
-            print('Exporting messages', file=sys.stderr)
+            print('INFO xporting messages', file=sys.stderr)
             for chid in await reader.db_message_channels(): # sort of an group by
                 for _chid, _msgid, data in await reader.db_messages_all(chid=chid):
                     dict_dt_replace_inplace(     data )
@@ -417,7 +417,7 @@ async def reader_work():
 
 
         if args.media_postlist:
-            print('saving list of media hashes that were posted in different channels', file=sys.stderr)
+            print('INFO saving list of media hashes that were posted in different channels', file=sys.stderr)
             
             ## also mention ech message it was on   (e.g. repeats, replies?)
             #count = collections.defaultdict(list)
@@ -441,7 +441,7 @@ async def reader_work():
 
 
         if args.media_save:
-            print('saving media', file=sys.stderr)
+            print('INFO saving media', file=sys.stderr)
 
             if not os.path.exists('media'):
                 os.mkdir('media')
