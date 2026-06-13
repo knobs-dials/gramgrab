@@ -6,6 +6,7 @@ import collections
 import asyncio
 import json
 import pprint
+import csv
 
 import gramgrab
 
@@ -315,9 +316,12 @@ async def reader_work():
             pprint.pprint( await reader.db_counts_all() )
 
 
-        if args.edgelists:
-            print('creating edge lists', file=sys.stderr)
+        if args.edgelists_csv:
+            print('INFO creating edge lists', file=sys.stderr)
             # edgelist, as in the other chats a message was forwarded from - meant to find related chats
+
+            if not os.path.exists('edgelists'):
+                os.mkdir('edgelists')
 
             chan_detail = {}
             for dt, chid, data in await reader.db_channel_details(): # we will get multiple per channel, but any one will do
@@ -326,11 +330,11 @@ async def reader_work():
             for chid in await reader.db_message_channels(): # sort of an group by
                 #print(' -- %s -- '%chid)
                 #print( chan_detail.get(chid,None).get('title') )
+                to_channel_title = gramgrab.getget( chan_detail, chid,'title')
 
+                rows = []
                 for in_chid, msgid, data in await reader.db_messages_all(chid=chid):
-                    #print()
-                    #pprint.pprint(data)
-                    to_channel_title = gramgrab.getget( chan_detail, in_chid,'title')
+                    
 
                     fwd_from = data.get('fwd_from', None)
                     if fwd_from is not None:
@@ -339,8 +343,26 @@ async def reader_work():
                             if 'channel_id' in from_id: # implicitly filters just for PeerChannel (...sources)
                                 from_channel_id = from_id['channel_id']
                                 from_channel_title = gramgrab.getget( chan_detail, from_channel_id,'title') # which we often do not know
-                                print( json.dumps({'from_chid':from_channel_id, 'from_title':from_channel_title,   'to_chid':in_chid, 'to_title':to_channel_title, 'to_msgid':msgid, 'date':data.get('date').strftime('%Y-%m-%dT%H:%M:%S%z'), 'message':data.get('message')}) )
-                    
+                                #print( json.dumps({'from_chid':from_channel_id, 'from_chid_title':from_channel_title,   'to_chid':in_chid, 'to_chid_title':to_channel_title, 'to_msgid':msgid, 'date':data.get('date').strftime('%Y-%m-%dT%H:%M:%S%z'), 'message':data.get('message')}) )
+                                rows.append([
+                                    from_channel_id, 
+                                    from_channel_title,  
+                                    in_chid, 
+                                    to_channel_title,  
+                                    msgid,
+                                    data.get('date').strftime('%Y-%m-%dT%H:%M:%S%z'), # assumes it's never None
+                                    data.get('message')
+                                ])
+
+                if len(rows) > 0: # only write if there's something to write
+                    print(f"INFO writing {len(rows):5d} edges towards {chid:12d} ({to_channel_title})")
+                    with open('edgelists/%s.csv'%chid,'w') as wf:
+                        csv_writer = csv.writer(wf, dialect='excel')
+                        csv_writer.writerow( ['from_chid', 'from_chid_title', 'to_chid', 'to_chid_title', 'to_msgid', 'date', 'message'] )
+                        csv_writer.writerows( rows )
+                else:
+                    print(f"INFO            no forwards into {chid:12d} ({to_channel_title})")
+
 
 
         if args.users_in_multiple_channels:
