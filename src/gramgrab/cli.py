@@ -123,9 +123,9 @@ async def fetcher_work():
     #parser.add_argument( "--fetch-referred-ch",        default=True, action='store_false',
     #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards), while.",
     #)
-    #parser.add_argument( "--fetch-referred-ch-catchup",default=False,action='store_true',
-    #    help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards).",
-    #)
+    parser.add_argument( "--skip-referred-ch-catchup",default=False,action='store_true',
+        help="For analysis: Get information about all channels referred to from stored messages (mostly sources of forwards). By default we do, add this to skip that.",
+    )
 
     # CONSIDER: add 'slow down' argument (wait_time?)
 
@@ -238,8 +238,8 @@ async def fetcher_work():
             try:
                 await fetcher.fetch_messages()
 
-                #if args.fetch_referred_ch_catchup:
-                await fetcher.catchup_referred_ch( ch_ent.id )
+                if not args.skip_referred_ch_catchup:
+                    await fetcher.catchup_referred_ch( ch_ent.id )
             finally:
                 await fetcher.db_close( commit=True ) # get the journal merged earlier rather than later
 
@@ -273,8 +273,8 @@ async def reader_work():
         help="count what we have fetched",
     )
 
-    parser.add_argument( "--edgelists",             default=False, action='store_true',
-        help="calculate edge lists",
+    parser.add_argument( "--edgelists-csv",         default=False, action='store_true',
+        help="calculate edge lists, one per channel, to edgelists/ in (excel-flavoured) CSV files",
     )
 
     parser.add_argument( "--users-in-multiple-channels", default=False, action='store_true',
@@ -282,11 +282,11 @@ async def reader_work():
     )
 
     parser.add_argument( "--media-postlist",        default=False, action='store_true',
-        help="",
+        help="Mention media that was posted as-is in distinct channels",
     )
 
     parser.add_argument( "--media-save",            default=False, action='store_true',
-        help="Save media to media/",
+        help="Save media to files in media/",
     )
 
     parser.add_argument( "--messages-jsonl",        default=False, action='store_true',
@@ -301,9 +301,9 @@ async def reader_work():
         help="Save channel data, one at a time (JSONL to stdout, removing some byte values)",
     )
 
-    #parser.add_argument( "--channel-relations-json",default=False, action='store_true',
-    #    help="Export information on how channels relate - forwards between them, overlapping active users",
-    #)
+    parser.add_argument( "--channel-relations-json",default=False, action='store_true',
+        help="Export information on how channels relate - forwards between them, overlapping active users",
+    )
 
     args = parser.parse_args()
 
