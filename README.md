@@ -20,9 +20,8 @@ Also consider consent for non-public channels.
 
 This tool does not send anything, so you won't get your account banned for spamming.
 
-Telegram still cares that we don't load their servers more than is reasonable, and will occasionally ask us to slow down. This code respects those requests, attempting to balance it with speed.
-
-What you request as a user also has an effect on this, in that different kinds of fetches count differently.   For example:
+Telegram still cares that we don't load their servers more than is reasonable, and will occasionally ask us to slow down. This code respects those requests, attempting to balance it with speed. 
+What you request as a user also has an effect on this, different kinds of fetches count differently.   For example:
 - fetching just messages is relatively cheap and fast
 - fetching media is somewhat slower
 - fetching full user details is slower yet, and seems to trigger the 'please slow down' more easily
@@ -36,7 +35,9 @@ What you request as a user also has an effect on this, in that different kinds o
 - If you want to run the development code from github, then assuming you use [poetry](https://python-poetry.org/docs/),
   - `git clone` this repository
   - run `poetry install` to have it set up the virtual environment
-  - after that you can run the main two commands, `poetry run gramgrab -h` and `poetry run gramparse -h`
+  - after that you can run the main two commands
+    - `poetry run gramgrab`, the part that contacts telegram and fetches things
+    - `poetry run gramparse`, the part that does something with what you already have locally
 
 
 ## Login
@@ -100,15 +101,15 @@ Telegram, telethon, and our code add a little flexibility, which means that even
 
 ### Backup
 
-By default, we fetch only messages - this is cheap and fast.
+We always fetch message, and by default fetch messages _only_ - this is relatively cheap and fast and usually the point.
 
-The options for basic use include:
-- `--fetch-media` - whether to also fetch the media (specifically images and documents) attached to the messages we fetch
-
-
-As we can continue previous fetches,
+Note that, bcause we can continue previous fetches,
 things related to messages that are _optional_ to fetch (e.g. media, reaction list) won't necessarily be fetchable later.
 So decide what you need before you start.
+
+Options for backup use include:
+- `--fetch-media` - whether to also fetch the media (specifically images and documents) attached to the messages we fetch
+
 
 
 ### Advanced
