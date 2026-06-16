@@ -539,7 +539,8 @@ class Fetcher:
                 #if 'user_id' in from_peer: # implicitly, '_' will be PeerUser
 
                 if 'channel_id' in from_dict: # implicitly, '_' will be PeerChannel
-                    print(f"INFO forward from channel {from_dict['channel_id']}")
+                    if self.debug >= 1:
+                        print(f"DEBUG forward from channel {from_dict['channel_id']}")
                     
                     # CONSIDER: putting this back if if we do a 'fetch full channel peer only if not known'
                     #try:

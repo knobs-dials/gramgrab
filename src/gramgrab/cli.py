@@ -279,7 +279,10 @@ async def reader_work():
     )
 
     parser.add_argument( "--edgelists-csv",         default=False, action='store_true',
-        help="calculate edge lists, one per channel, to edgelists/ in (excel-flavoured) CSV files",
+        help="calculate edge lists, one per channel, to (excel-flavoured) CSV files in edgelists/",
+    )
+    parser.add_argument( "--edgelists-json",         default=False, action='store_true',
+        help="calculate edge lists, one per channel, to JSONL files in edgelists/",
     )
 
     parser.add_argument( "--users-in-multiple-channels", default=False, action='store_true',
@@ -326,7 +329,7 @@ async def reader_work():
             pprint.pprint( await reader.db_counts_all() )
 
 
-        if args.edgelists_csv:
+        if args.edgelists_csv or args.edgelists_json:
             print('INFO creating edge lists', file=sys.stderr)
             # edgelist, as in the other chats a message was forwarded from - meant to find related chats
 
@@ -342,10 +345,9 @@ async def reader_work():
                 #print( chan_detail.get(chid,None).get('title') )
                 to_channel_title = gramgrab.getget( chan_detail, chid,'title')
 
-                rows = []
+                header = ['from_chid', 'from_chid_title', 'to_chid', 'to_chid_title', 'to_msgid', 'date', 'message']
+                rows   = []
                 for in_chid, msgid, data in await reader.db_messages_all(chid=chid):
-                    
-
                     fwd_from = data.get('fwd_from', None)
                     if fwd_from is not None:
                         from_id = fwd_from.get('from_id', None)
@@ -364,12 +366,21 @@ async def reader_work():
                                     data.get('message')
                                 ])
 
-                if len(rows) > 0: # only write if there's something to write
+                if len(rows) > 0: # avoid writing empty files
                     print(f"INFO writing {len(rows):5d} edges towards {chid:12d} ({to_channel_title})")
-                    with open('edgelists/%s.csv'%chid,'w') as wf:
-                        csv_writer = csv.writer(wf, dialect='excel')
-                        csv_writer.writerow( ['from_chid', 'from_chid_title', 'to_chid', 'to_chid_title', 'to_msgid', 'date', 'message'] )
-                        csv_writer.writerows( rows )
+                    if args.edgelists_csv:
+                        with open('edgelists/%s.json'%chid,'w') as wf:
+                            csv_writer = csv.writer(wf, dialect='excel')
+                            csv_writer.writerow( header )
+                            csv_writer.writerows( rows )
+                    if args.edgelists_json:
+                        with open('edgelists/%s.csv'%chid,'w') as wf:
+                            item = {}
+                            for row in rows:
+                                for k, v in zip(header, row):
+                                    item[k] = v
+                                wf.write( json.dumps(item) )
+                                wf.write('\n')
                 else:
                     print(f"INFO            no forwards into {chid:12d} ({to_channel_title})")
 
