@@ -285,6 +285,10 @@ async def reader_work():
         help="calculate edge lists, one per channel, to JSONL files in edgelists/",
     )
 
+    parser.add_argument( "--channel-list", default=False, action='store_true',
+        help="List channels we have messages for, and channels fetch information about because we saw it mentioned.",
+    )
+
     parser.add_argument( "--users-in-multiple-channels", default=False, action='store_true',
         help="Summarize users seen in multiple channels (JSONL output)",
     )
@@ -327,6 +331,29 @@ async def reader_work():
         if args.count:
             print('INFO Counting what we have...', file=sys.stderr)
             pprint.pprint( await reader.db_counts_all() )
+
+
+        if args.channel_list:
+
+            have_messages_for = set()
+
+            for chid in await reader.db_message_channels():
+                have_messages_for.add( chid )
+
+            ld = collections.defaultdict( list )
+            for dt, chid, data in await reader.db_channel_details(): # we will get multiple per channel, but any one will do
+                ld[chid].append( data ) # so that we can (TODO:) note changes in specific fields
+
+            ret = []
+            for chid, dicts in ld.items():
+                data = dicts[-1]
+                channel_title = gramgrab.dict_fuzzy_get( data, 'title' )
+                havemsg = (chid in have_messages_for) and "have messages" or "mentioned"
+                ret.append( (chid, havemsg, channel_title) )
+
+            ret.sort(key=lambda x:x[1])
+            for chid, havemsg, channel_title in ret:
+                print( f'{chid:14d}  {havemsg:^15s}  {channel_title}')
 
 
         if args.edgelists_csv or args.edgelists_json:
