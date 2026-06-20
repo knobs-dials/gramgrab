@@ -174,6 +174,37 @@ def getget(d, k1, k2):
     return d2.get(k2, None)  # d2 is assumed to be a dict-like
 
 
+def dict_fuzzy_get(d, needlekey, first_non_none=False):
+    """ Find key anywhere in nested dict structure.
+        Some data structures would take a few lines of code to pick values out of,
+        this can help ...whenever you know the key is actually unique.
+
+        Also, this this argues we should be better at describing data structires, 
+        and/or better help pick out certain values.
+
+        Returns first match, regardless of value.
+        TODO: allow continuing to look for first non-None match
+    """
+    # TODO: check whether that code can be more succinct
+    for ik, iv in d.items():
+        if ik == needlekey and iv is not None: # before the type tests we can return complex values if the key matches
+            if iv is None and first_non_none:
+                pass
+            else:
+                return iv
+        if isinstance(iv, dict):
+            t = dict_fuzzy_get(iv, needlekey, first_non_none)
+            if t is not None:
+                return t
+        elif isinstance(iv, list):
+            for li in iv:
+                if isinstance(li, dict):
+                    t =  dict_fuzzy_get(li, needlekey, first_non_none)
+                    if t is not None:
+                        return t
+    return None # if nothing in the dict matches, we end up here. Returning None is implied anyway, but let's be clear
+
+
 
 
 ######################## CLASSES #############################################################################
