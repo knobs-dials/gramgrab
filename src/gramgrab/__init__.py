@@ -823,7 +823,7 @@ class GGDB:
 
 
     async def db_message_channels(self):
-        ' Return the distint channels that we have stored messages for. '
+        ' Return the distinct channels that we have stored messages for (just the IDs) '
         sql = 'SELECT DISTINCT chid FROM messages'
         curs = self.conn.cursor()
         try:
@@ -909,7 +909,10 @@ class GGDB:
 
     async def db_channel_details(self):
         """ Note that these are snapshots of their metadata, so that you can notice changes.
-            If you do not care, any one of them will do 
+            If you do not care, any one of them will do. 
+
+            Returned in order of date, so that it might be slightly easier to use the last
+            (though note that is not necessarily the most informative).
 
             Returns sequence of (recorded_at, chid, data)
         """
