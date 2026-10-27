@@ -49,10 +49,9 @@ You will need
   For singular uses like this it becomes just a necessary step, to create one and fill it in.
   See https://core.telegram.org/api/obtaining_api_id
 
-- your account's phone number
-
 - to authenticate the way your account is already configured for
-  The likeliest for you to use is password or code, both seem to work well - though require some interaction.   Further auth methods that require graphical interaction are currently not implemented.
+  - your account's phone number, plus usually either a password or code - though this requires some interaction.
+  - Further auth methods that require graphical interaction are currently not implemented.
 
 
 More concretely
@@ -68,9 +67,10 @@ More concretely
 
 ## Telling it what to fetch
 
-Note that the session and fetched data will both be stored in the current directory,
-to to reuse the same session, continue the fetching from before, and extract from what you've fetched before,
-run repeat fetches (and the reader) from the same directory.
+The session and fetched data will both be stored in the current directory,
+to reuse the same session,
+to continue fetches you did before, and
+to be able to extract what you have fetched previously.
 
 The fetching is done with `gramgrab`.  Add `-h` for some options.
 
@@ -81,31 +81,31 @@ The minimum you need to supply is `--ch`, to specify a channel (or chat) to fetc
 
 For public channels, its name is probably easiest, its ID will also work.
 
-To fetch IDs for private chats/channels you are a member of, you can use `--list-my-dialogs`
+To fetch IDs for private chats/channels your account is already a member of, you can use `--list-my-dialogs`
 
 <!--
-this lets you refer to things you do not currently have access to, which will resolve fine, but not do anything else
-
-
 Because Chats, Channels, and Users all are separately assigned (32-bit) pools,
 IDs may exist in each.
 
 As such, external-facing IDs are put into a larger range where they do not, where
 -100xxxxxxxx are channel ids, 
-negative _without_ the 100 is chats,
-and positive is users positive is users
+negative _without_ the 100 are chats,
+and positive is users positive are users
 
-Telegram, telethon, and our code add a little flexibility, which means that even if you hand in the internal IDs it ''might'' work, but ther are rough edges to this.
+Telegram, telethon, and our code all add a little flexibility,
+meaning that it might work even if you don't stick to that,
+but also that there are some rough edges to this.
 -->
 
 
 ### Backup
 
-We always fetch message, and by default fetch messages _only_ - this is relatively cheap and fast and usually the point.
-
-Note that, bcause we can continue previous fetches,
-things related to messages that are _optional_ to fetch (e.g. media, reaction list) won't necessarily be fetchable later.
 So decide what you need before you start.
+
+We always fetch messages, and by default fetch messages _only_ - this is relatively cheap and fast and usually the main point.
+
+But (in part because we can continue previous fetches),
+things related to messages that are _optional_ to fetch (e.g. media, reaction list) won't necessarily be fetchable later.
 
 Options for backup use include:
 - `--fetch-media` - whether to also fetch the media (specifically images and documents) attached to the messages we fetch
@@ -116,7 +116,7 @@ Options for backup use include:
 
 For more OSINT-like applications, we provide some extras
 
-- we always save that users have been seen posting messages - it's implied from the message data anyway
+- we always also save where users have been seen posting messages (it's implied from already public message data anyway)
 
 - you can optionally add users we have seen do emoji reactions to messages: see `--users-from-reaction`
 
@@ -128,12 +128,17 @@ For more OSINT-like applications, we provide some extras
 
 ### Backup
 
-If you've fetched things for backup you may want to export what we've fetched. You may be mostly interested in: `gramparse --messages-jsonl --media-save`
+If you've fetched things for backup you may want to export what we've fetched to a format you are more comfortable with. 
+
+You may be mostly interested in: `gramparse --messages-jsonl --media-save`
 
 
 ### Advanced
 
-If you've fetched for OSINT use you want some analysis.
+If you've fetched for OSINT use you want some analysis. 
+
+Some of this is easier while it is still in the database,
+other things may be easier to do from exported data.
 
 This is work in progress, see `gramparse -h`
 
@@ -145,12 +150,16 @@ This is work in progress, see `gramparse -h`
 ### "Can you parallelize it?"
 
 For speed?  There would be no point.
-Your account is rate-limited by the telegram servers, and nothing you do client-side changes that.
+Your account is rate-limited by the telegram servers, 
+and ''nothing'' you change client-side changes that.
 
 
-### "Why save media in the database, not files?"
+### "Why save media in the database, not to files?"
 
-There are a few things we can do slightly more easily while we haven't separated the file data from the information of where it came from. Not a lot, though.
+Either is viable.  
+There are a ''few'' things we can do slightly more easily while we haven't separated the file data from the information of where it came from. Not a lot, though.
 
 You can save all with `grabparse --media-save`
+
+
 -->
