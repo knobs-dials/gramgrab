@@ -16,7 +16,7 @@ while trying to learn another tool like it.
 ## Notes on speed (and abuse)
 
 It is your responsibility to comply to the [Telegram API ToS](https://core.telegram.org/api/terms). 
-Also consider consent for non-public channels.
+Also, consider consent for non-public channels.
 
 This tool does not send anything, so you won't get your account banned for spamming.
 
